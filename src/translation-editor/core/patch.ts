@@ -3,7 +3,7 @@ import type { MaybePromise } from "../utils";
 
 export interface CreateDiffOptions {
   getFile: (fileName: string) => MaybePromise<string | null>;
-  getPatch: (fileName: string) => CreatePatchFunction;
+  getPatch: (fileName: string) => MaybePromise<CreatePatchFunction>;
   patchOptions?: Pick<CreatePatchOptions, "sort" | "diff">;
 }
 
@@ -11,15 +11,18 @@ export async function createDiff(
   modifiedByFile: Record<string, Record<string, string>>,
   options: CreateDiffOptions,
 ): Promise<string> {
-  let diff = "";
-  for (const fileName in modifiedByFile) {
-    const original = await options.getFile(fileName);
-    if (original == null) continue;
-    const messages = modifiedByFile[fileName]!;
-    const createPatch = options.getPatch(fileName);
-    diff += await createPatch(fileName, original, messages, options.patchOptions);
-  }
-  return diff;
+  const patches = await Promise.all(
+    Object.keys(modifiedByFile).map(async (fileName) => {
+      const [original, createPatch] = await Promise.all([
+        options.getFile(fileName),
+        options.getPatch(fileName),
+      ]);
+      if (original == null) return "";
+      const messages = modifiedByFile[fileName]!;
+      return createPatch(fileName, original, messages, options.patchOptions);
+    }),
+  );
+  return patches.join("");
 }
 
 export interface ApplyDiffOptions {

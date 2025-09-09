@@ -1,15 +1,26 @@
 import { defaultCompare, defaultDiff, type CreatePatchOptions } from "../patch";
 
+export interface CreateJsonPatchOptions extends CreatePatchOptions {
+  parse?: (str: string) => unknown;
+  stringify?: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    value: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    replacer?: ((this: any, key: string, value: any) => any) | null,
+    space?: string | number | null,
+  ) => string;
+}
+
 export async function createJsonPatch(
   fileName: string,
   originalStr: string,
   modified: Record<string, string>,
-  options: CreatePatchOptions = {},
+  options: CreateJsonPatchOptions = {},
 ): Promise<string> {
-  const { sort = true } = options;
+  const { parse = JSON.parse, stringify = JSON.stringify, sort = true } = options;
 
   const compare = typeof sort == "function" ? sort : defaultCompare;
-  const original = JSON.parse(originalStr);
+  const original = parse(originalStr);
 
   const insert = (obj: Record<string, unknown>, key: string, value: unknown) => {
     let tmp: Record<string, unknown> | undefined;
@@ -42,15 +53,11 @@ export async function createJsonPatch(
     insert(obj, key, value);
   }
 
-  const modifiedStr = JSON.stringify(original, null, 2) + "\n";
+  const modifiedStr = stringify(original, undefined, 2) + "\n";
   const formattedStr = (await options.format?.(modifiedStr)) ?? modifiedStr;
 
   const diff = options.diff ?? defaultDiffJson;
   return diff(fileName, originalStr, formattedStr);
-}
-
-export function parseJson(str: string): unknown {
-  return JSON.parse(str);
 }
 
 const defaultDiffJson = defaultDiff(2);

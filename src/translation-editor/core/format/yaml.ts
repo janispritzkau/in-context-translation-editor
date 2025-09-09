@@ -1,11 +1,13 @@
 import { isMap, parse, parseDocument, YAMLMap } from "yaml";
 import { defaultCompare, defaultDiff, type CreatePatchOptions } from "../patch";
 
+export type CreateYamlPatchOptions = CreatePatchOptions;
+
 export async function createYamlPatch(
   fileName: string,
   originalStr: string,
   modified: Record<string, string>,
-  options: CreatePatchOptions = {},
+  options: CreateYamlPatchOptions = {},
 ): Promise<string> {
   const { sort = true } = options;
 
@@ -45,8 +47,6 @@ export async function createYamlPatch(
   return diff(fileName, originalStr, formattedStr);
 }
 
-export function parseYaml(str: string): unknown {
-  return parse(str);
-}
-
 const defaultDiffYaml = defaultDiff(1);
+
+export { parse as parseYaml };
