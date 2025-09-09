@@ -34,7 +34,6 @@ export function createMessageCompiler(
           values[key] = [prefix, value, suffix];
         }
       }
-      console.log("values", values);
 
       const translated = translate({
         ...ctx,

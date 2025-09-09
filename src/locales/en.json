@@ -1,0 +1,14 @@
+{
+  "message": {
+    "youDidIt": "You did it!",
+    "seeDocs": "Visit {link} to read the documentation"
+  },
+  "car": "car | cars",
+  "apple": "no apples | one apple | {count} apples",
+  "banana": "no bananas | {n} banana | {n} bananas",
+  "tos": "Term of Service",
+  "term": "I accept xxx {0}.",
+  "info": "You can {action} until {limit} minutes from departure.",
+  "change": "change your flight",
+  "refund": "refund the ticket"
+}

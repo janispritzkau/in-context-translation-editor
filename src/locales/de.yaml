@@ -1,0 +1,11 @@
+message:
+  youDidIt: "Du hast es geschafft!"
+  seeDocs: "Besuche {link}, um die Dokumentation zu lesen"
+
+# "info": "You can {action} until {limit} minutes from departure.",
+# "change": "change your flight",
+# "refund": "refund the ticket"
+
+info: "Sie können bis zu {limit} Minuten vor Abfahrt {action}."
+change: "Ihren Flug umbuchen"
+refund: "das Ticket zurückerstatten"

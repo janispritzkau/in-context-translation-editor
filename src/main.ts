@@ -11,3 +11,5 @@ app.use(i18n);
 app.use(router);
 
 app.mount("#app");
+
+import("./_async");
