@@ -1,98 +1,164 @@
 export interface MessageMapper {
   prefix: string;
   suffix: string;
-  messageId(message: string): number;
-  messageById(id: number): string | null;
-  variableId(variable: string, message: string): number;
-  variableById(id: number, message: string): string | null;
-  prefixWithType(type: Key["type"]): string;
-  suffixWithId(id: number, type: Key["type"]): string;
-  readPrefix(input: string): { type: Key["type"]; length: number } | null;
-  readSuffix(input: string, type: Key["type"]): { id: number; length: number } | null;
+  messageId(message: MessageKey): number;
+  messageById(id: number): MessageKey | null;
+  variableId(variable: string, messageId: number): number;
+  variableById(id: number, messageId: number): VariableKey | null;
+  writePrefix(type: KeyType): string;
+  writeSuffix(id: number, type: KeyType): string;
+  readPrefix(input: string): { type: KeyType; length: number } | null;
+  readSuffix(input: string, type: KeyType): { id: number; length: number } | null;
+  messages(): IterableIterator<MessageKey>;
+  variables(messageId: number): IterableIterator<VariableKey>;
+  reset(): void;
 }
 
-export type Key = { type: "message"; key: string } | { type: "variable"; key: string };
+export type KeyType = "message" | "variable";
+export type MessageKey = { locale: string; message: string };
+export type VariableKey = { variable: string };
 
 export interface MessageMapperOptions {
   prefix?: string;
   suffix?: string;
-  writeId?(type: Key["type"], id: number): string;
-  readId?(type: Key["type"], input: string): { id: number; length: number } | null;
+  writeType?(type: KeyType): string;
+  readType?(input: string): { type: KeyType; length: number } | null;
+  writeId?(id: number, length: number): string;
+  readId?(input: string, length: number): number | null;
 }
 
 export function createMessageMapper(options: MessageMapperOptions = {}): MessageMapper {
   const {
     prefix = PREFIX,
     suffix = SUFFIX,
+    writeType = defaultWriteType,
+    readType = defaultReadType,
     writeId = defaultWriteId,
     readId = defaultReadId,
   } = options;
 
-  const messages: string[] = [];
-  const variablesByMessage: Record<string, string[]> = {};
+  let locales: string[] = [];
+  let messagesByLocale: Record<number, string[]> = {};
+  let variablesByMessage: Record<number, string[]> = {};
 
   return {
     prefix,
     suffix,
     messageId(message) {
-      let id = messages.indexOf(message);
-      if (id == -1) {
-        id = messages.length;
-        messages.push(message);
+      let localeId = locales.indexOf(message.locale);
+      if (localeId == -1) {
+        localeId = locales.length;
+        locales.push(message.locale);
+        messagesByLocale[localeId] = [];
       }
-      return id;
+      const messages = messagesByLocale[localeId]!;
+      let messageId = messages.indexOf(message.message);
+      if (messageId == -1) {
+        messageId = messages.length;
+        messages.push(message.message);
+      }
+      return (messageId << MESSAGE_SIZE) | localeId;
     },
     messageById(id) {
-      return messages[id] ?? null;
+      const localeId = id & LOCALE_MASK;
+      const messageId = id >> MESSAGE_SIZE;
+      const locale = locales[localeId];
+      const message = messagesByLocale[localeId]?.[messageId];
+      if (locale == null || message == null) return null;
+      return { locale, message };
     },
-    variableId(variable, message) {
-      let variables = variablesByMessage[message];
-      if (!variables) {
-        variables = [];
-        variablesByMessage[message] = variables;
-      }
-      let id = variables.indexOf(variable);
-      if (id == -1) {
-        id = variables.length;
+    variableId(variable, messageId) {
+      const variables = (variablesByMessage[messageId] ??= []);
+      let variableId = variables.indexOf(variable);
+      if (variableId == -1) {
+        variableId = variables.length;
         variables.push(variable);
       }
-      return id;
+      return variableId;
     },
-    variableById(id, message) {
-      const variables = variablesByMessage[message];
-      return variables?.[id] ?? null;
+    variableById(id, messageId) {
+      const variable = variablesByMessage?.[messageId]?.[id];
+      if (variable == null) return null;
+      return { variable };
     },
-    prefixWithType(type) {
-      return prefix + ID_CHARS[TAG_BY_TYPE[type]];
+    writePrefix(type) {
+      return prefix + writeType(type);
     },
-    suffixWithId(id, type) {
-      return suffix + writeId(type, id);
+    writeSuffix(id, type) {
+      const length = LENGTH_BY_TYPE[type];
+      return suffix + writeId(id, length);
     },
     readPrefix(input) {
-      if (!input.startsWith(prefix) || input.length < prefix.length + 1) return null;
-      const tag = input[prefix.length]!;
-      const type = TYPE_BY_TAG[ID_CHARS.indexOf(tag)];
+      if (!input.startsWith(prefix)) return null;
+      const type = readType(input.slice(prefix.length));
       if (type == null) return null;
-      return { type, length: prefix.length + 1 };
+      return { type: type.type, length: prefix.length + type.length };
     },
     readSuffix(input, type) {
       if (!input.startsWith(suffix)) return null;
-      const id = readId(type, input.slice(suffix.length));
+      const length = LENGTH_BY_TYPE[type];
+      const id = readId(input.slice(suffix.length), length);
       if (id == null) return null;
-      return { id: id.id, length: suffix.length + id.length };
+      return { id, length: suffix.length + length };
+    },
+    *messages() {
+      for (let localeId = 0; localeId < locales.length; localeId++) {
+        const locale = locales[localeId]!;
+        const messages = messagesByLocale[localeId]!;
+        for (let messageId = 0; messageId < messages.length; messageId++) {
+          const message = messages[messageId]!;
+          yield { locale, message };
+        }
+      }
+    },
+    *variables(messageId) {
+      const variables = variablesByMessage[messageId];
+      if (!variables) return;
+      for (let variableId = 0; variableId < variables.length; variableId++) {
+        const variable = variables[variableId]!;
+        yield { variable };
+      }
+    },
+    reset() {
+      locales = [];
+      messagesByLocale = {};
+      variablesByMessage = {};
     },
   };
 }
 
-const PREFIX = "\u200c\u200d";
-const SUFFIX = "\u200d\u200c";
+const PREFIX = "\u200c\u200d\u200b";
+const SUFFIX = "\u200d\u200c\u200b";
 const ID_CHARS = "\u200b\u200c\u200d";
+
 const TAG_BY_TYPE = { message: 0, variable: 1 } as const;
 const TYPE_BY_TAG = ["message", "variable"] as const;
-const LENGTH_BY_TYPE = [9, 3] as const; // 19683 messages, 27 variables
 
-const defaultReadId: Required<MessageMapperOptions>["readId"] = function readId(type, input) {
-  const length = LENGTH_BY_TYPE[TAG_BY_TYPE[type]];
+const LOCALE_SIZE = 3; // 3^3 = 27
+const MESSAGE_SIZE = 7; // 3^7 = 2187
+const VARIABLE_SIZE = 3; // 3^3 = 27
+
+const LOCALE_MASK = (1 << LOCALE_SIZE) - 1;
+
+const LENGTH_BY_TYPE = {
+  message: LOCALE_SIZE + MESSAGE_SIZE,
+  variable: VARIABLE_SIZE,
+} as const;
+
+const defaultReadType: Required<MessageMapperOptions>["readType"] = function readType(input) {
+  if (input.length < 1) return null;
+  const index = ID_CHARS.indexOf(input[0]!);
+  if (index == -1) return null;
+  const type = TYPE_BY_TAG[index];
+  if (type == null) return null;
+  return { type, length: 1 };
+};
+
+const defaultWriteType: Required<MessageMapperOptions>["writeType"] = function writeType(type) {
+  return ID_CHARS[TAG_BY_TYPE[type]]!;
+};
+
+const defaultReadId: Required<MessageMapperOptions>["readId"] = function readId(input, length) {
   if (input.length < length) return null;
   let id = 0;
   for (let i = 0; i < length; i++) {
@@ -100,11 +166,10 @@ const defaultReadId: Required<MessageMapperOptions>["readId"] = function readId(
     if (index == -1) return null;
     id = id * 3 + index;
   }
-  return { length, id };
+  return id;
 };
 
-const defaultWriteId: Required<MessageMapperOptions>["writeId"] = function writeId(type, id) {
-  const length = LENGTH_BY_TYPE[TAG_BY_TYPE[type]];
+const defaultWriteId: Required<MessageMapperOptions>["writeId"] = function writeId(id, length) {
   if (id >= 3 ** length) throw new Error(`ID is too large: ${id}`);
   let str = "";
   for (let i = 0; i < length; i++) {
@@ -115,3 +180,5 @@ const defaultWriteId: Required<MessageMapperOptions>["writeId"] = function write
 };
 
 export const messageMapper = createMessageMapper();
+
+Object.assign(globalThis, { messageMapper });

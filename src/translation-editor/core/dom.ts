@@ -2,6 +2,7 @@ import { messageMapper, type MessageMapper } from "./messages";
 
 export interface MessageRange {
   range: Range;
+  locale: string;
   message: string;
   variables: MessageVariableRange[];
 }
@@ -80,7 +81,7 @@ export function* traverseMessages(
         offset = suffixIndex + suffix.length;
 
         const range = last.valueRange ?? last.range;
-        if (isTextNode) range.setEnd(node, suffixIndex + mapper.suffix.length);
+        if (isTextNode) range.setEnd(node, suffixIndex + suffix.length);
 
         if (last.valueRange) {
           last.variables.push({ range, id: suffix.id, messages: last.valueMessages });
@@ -91,12 +92,13 @@ export function* traverseMessages(
           if (!message) continue;
           const messageRange: MessageRange = {
             range,
-            message,
+            locale: message.locale,
+            message: message.message,
             variables: last.variables
               .map((v) => {
-                const variable = mapper.variableById(v.id, message);
+                const variable = mapper.variableById(v.id, suffix.id);
                 if (!variable) return null;
-                return { range: v.range, variable, messages: v.messages };
+                return { range: v.range, variable: variable.variable, messages: v.messages };
               })
               .filter((v) => v != null),
           };

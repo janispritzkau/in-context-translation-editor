@@ -19,13 +19,19 @@ export function createMessageCompiler(
     const translate = compile(message, context);
     if (isEnabled.value == false) return translate;
 
+    const messageId = mapper.messageId({
+      locale: context.locale,
+      message: context.key,
+    });
+
     return (ctx: MessageContext<VueMessageType>): MessageFunctionReturn<VueMessageType> => {
       const values: Record<string, unknown> = {};
+
       for (const key in ctx.values) {
         const value = ctx.values[key];
-        const id = mapper.variableId(key, context.key);
-        const prefix = mapper.prefixWithType("variable");
-        const suffix = mapper.suffixWithId(id, "variable");
+        const prefix = mapper.writePrefix("variable");
+        const suffix = mapper.writeSuffix(mapper.variableId(key, messageId), "variable");
+
         if (typeof value === "string" || typeof value === "number") {
           values[key] = prefix + value + suffix;
         } else if (Array.isArray(value)) {
@@ -42,9 +48,8 @@ export function createMessageCompiler(
         values,
       });
 
-      const id = mapper.messageId(context.key);
-      const prefix = mapper.prefixWithType("message");
-      const suffix = mapper.suffixWithId(id, "message");
+      const prefix = mapper.writePrefix("message");
+      const suffix = mapper.writeSuffix(messageId, "message");
 
       return typeof translated == "string"
         ? prefix + translated + suffix
