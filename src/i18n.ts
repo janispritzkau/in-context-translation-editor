@@ -1,8 +1,17 @@
-import { createI18n } from "vue-i18n";
+import { createI18n, type VueMessageType } from "vue-i18n";
 import { messageCompiler } from "./translation-editor/vue-i18n";
-import messages from "@intlify/unplugin-vue-i18n/messages";
 
-console.log(messages);
+const messagesByFile = import.meta.glob("./*", {
+  eager: true,
+  import: "default",
+  base: "./locales",
+}) as Record<string, Record<string, VueMessageType>>;
+
+const messages: Record<string, Record<string, VueMessageType>> = {};
+for (const path in messagesByFile) {
+  const locale = path.slice(path.indexOf("/") + 1, path.lastIndexOf("."));
+  messages[locale] = messagesByFile[path] as Record<string, VueMessageType>;
+}
 
 const i18n = createI18n({
   legacy: false,
