@@ -1,0 +1,17 @@
+message:
+  hello: Hello, World!
+  welcome: Hello {0}!
+  date: Today's date is {date}
+
+info: You can {action} until {limit} minutes from departure.
+change: change your flight
+refund: refund the ticket
+
+# ignore
+testing: 1234
+
+search: Search
+description: "This is a sample application to demonstrate vue-i18n capabilities. @:additional"
+additional: "You can use it to translate your app into multiple languages."
+
+apples: You have {count} apple | You have {count} apples
